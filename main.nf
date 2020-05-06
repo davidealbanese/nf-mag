@@ -84,7 +84,7 @@ process spades {
     set val(id), path(reads) from clean_reads_spades
 
     output:
-    path "spades/*_scaffolds.fasta"
+    path "spades/scaffolds.fasta"
 
     script:
     task_memory_GB = task.memory.toGiga()
