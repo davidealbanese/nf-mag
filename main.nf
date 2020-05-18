@@ -10,7 +10,7 @@ Channel
  */
 if (params.interleaved) {
     process reformat {
-        container 'metashot/bbtools:38.79'
+        container 'metashot/bbtools:38.79-1'
         
         cpus 2
         memory { 2.GB * (2**(task.attempt-1)) }
@@ -47,7 +47,7 @@ if (params.interleaved) {
  */
 
 process raw_reads_stats {
-    container 'metashot/bbtools:38.79'
+    container 'metashot/bbtools:38.79-1'
     
     cpus 2
     memory { 2.GB * (2**(task.attempt-1)) }
@@ -85,7 +85,7 @@ process raw_reads_stats {
  */
 if (!params.skip_adapter_trimming) {
     process adapter_trimming {
-        container 'metashot/bbtools:38.79'
+        container 'metashot/bbtools:38.79-1'
         
         cpus 4
         memory { 2.GB * (2**(task.attempt-1)) }
@@ -134,7 +134,7 @@ if (!params.skip_adapter_trimming) {
  */
 if (!params.skip_contaminant_filtering) {
     process contaminant_filtering {
-        container 'metashot/bbtools:38.79'
+        container 'metashot/bbtools:38.79-1'
 
         cpus 4
         memory { 2.GB * (2**(task.attempt-1)) }
@@ -178,7 +178,7 @@ if (!params.skip_contaminant_filtering) {
  */
 if (!params.skip_quality_trimming) {
     process quality_trimming {
-        container 'metashot/bbtools:38.79'
+        container 'metashot/bbtools:38.79-1'
         
         cpus 4
         memory { 2.GB * (2**(task.attempt-1)) }
@@ -217,11 +217,11 @@ if (!params.skip_quality_trimming) {
 
 
 /*
- * Step 1.b Clean reads histograms.
+ * Step 3. Clean reads histograms.
  */
 
 process clean_reads_stats {
-    container 'metashot/bbtools:38.79'
+    container 'metashot/bbtools:38.79-1'
     
     cpus 2
     memory { 2.GB * (2**(task.attempt-1)) }
@@ -233,7 +233,8 @@ process clean_reads_stats {
     publishDir "${params.outdir}/samples/${id}/clean_reads_stats" , mode: 'copy'
 
     when:
-    ! (params.skip_adapter_trimming && params.skip_contaminant_filtering &&
+    ! (params.skip_adapter_trimming && 
+       params.skip_contaminant_filtering &&
        params.skip_quality_trimming)
 
     input:
@@ -259,16 +260,16 @@ process clean_reads_stats {
 }
 
 /*
- * Step 3.a Assembly with Spades.
+ * Step 4.a Assembly with Spades.
  */
 if (!params.single_end && !params.megahit_only) {
     process spades {
-        container 'metashot/spades:3.14.0'
+        container 'metashot/spades:3.14.0-1'
         
-        cpus 10
+        cpus 4
         time = 12.h
-        memory { 32.GB * (2**(task.attempt-1)) }
-        maxRetries 3
+        memory { 4.GB * (2**(task.attempt-1)) }
+        maxRetries 1
         errorStrategy 'retry'
     
         tag "${id}"
@@ -292,8 +293,7 @@ if (!params.single_end && !params.megahit_only) {
             --meta \
             --only-assembler \
             -1 ${reads[0]} \
-            -2 ${reads[1]}  \
-            -k 21,33,55,77,99 \
+            -2 ${reads[1]} \
             --threads ${task.cpus} \
             --memory ${task_memory_GB} \
             -o spades
@@ -304,16 +304,16 @@ if (!params.single_end && !params.megahit_only) {
 }
 
 /*
- * Step 3.b Assembly with Megahit.
+ * Step 4.b Assembly with Megahit.
  */
 
 if (params.single_end || params.megahit_only) {
     process megahit {
-        container 'metashot/megahit:1.2.9'
+        container 'metashot/megahit:1.2.9-1'
 
-        cpus 10
+        cpus 4
         time = 12.h
-        memory { 32.GB * (2**(task.attempt-1)) }
+        memory { 1.GB * (2**(task.attempt-1)) }
         maxRetries 3
         errorStrategy 'retry'
 
@@ -328,11 +328,10 @@ if (params.single_end || params.megahit_only) {
 
         output:
         tuple val(id), path("megahit/final.contigs.fa") into scaffolds_megahit
-        path "megahit/log"
 
         script:
         task_memory_GB = task.memory.toGiga()
-        def input = params.single_end ? "-r \"$reads\"" :  "-1 \"${reads[0]}\" -2 \"${reads[1]}\""
+        input = params.single_end ? "-r \"$reads\"" :  "-1 \"${reads[0]}\" -2 \"${reads[1]}\""
         """
         megahit \
             $input \
@@ -354,10 +353,10 @@ scaffolds_spades
     .set {scaffolds_stats}
 
 /*
- * Step 4. Scaffold statistics.
+ * Step 5. Scaffold statistics.
  */
 process assembly_stats {
-    container 'metashot/bbtools:38.79'
+    container 'metashot/bbtools:38.79-1'
     
     // Stats is single threaded. Stats uses 120MB of RAM regardless
     // of the assembly size.
